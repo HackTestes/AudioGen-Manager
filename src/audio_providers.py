@@ -10,7 +10,7 @@ class AudioProvider_NoCapacityLeft(Exception):
 from enum import Enum
 
 class TaskSatus(Enum):
-    SUCESS = 1
+    SUCCESS = 1
     FAIL = 2
     RETRY = 3
 
@@ -18,7 +18,7 @@ class TaskResult():
     def __init__(self, status, return_code, data):
         self.status = status
         self.return_code = return_code
-        self.data = data
+        self.task = task
 
 # This is responsible for managing a single subprocess
 # It will hold critical information to help manage the task (like what was run, how many retries were made...)
@@ -84,7 +84,7 @@ class AudioProvider():
         if lang not in self.commands:
             raise AudioProvider_LanguageNotSupported()
 
-        if not self.has_space():
+        if not self.has_capacity():
             raise AudioProvider_NoCapacityLeft()
 
         current_command = self.commands[lang]
@@ -104,7 +104,7 @@ class AudioProvider():
     # - need retries; or
     # - failed.
     # And return these results
-    def get_tasks(self):
+    def get_tasks_results(self):
 
         tasks_info = []
 
@@ -133,7 +133,7 @@ class AudioProvider():
                     self.task_handles[idx] = None
                     self.task_empty_slot.add(idx)
 
-                    tasks_info.append( TaskResult(TaskSatus.FAIL, None, task.data()) )
+                    tasks_info.append( TaskResult(TaskSatus.FAIL, task.poll(), task.data()) )
                     continue
 
             # Did it finish successfully?
@@ -143,13 +143,13 @@ class AudioProvider():
                 self.task_handles[idx] = None
                 self.task_empty_slot.add(idx)
 
-                tasks_info.append( TaskResult(TaskSatus.SUCESS, None, task.data()) )
+                tasks_info.append( TaskResult(TaskSatus.SUCESS, task.poll(), task.data()) )
                 continue
 
         return tasks_info
 
     # Check if the execution limits were hit
-    def has_space(self):
+    def has_capacity(self):
 
         if len(self.task_handles)-len(self.task_empty_slot) < self.execution_limit:
             return True

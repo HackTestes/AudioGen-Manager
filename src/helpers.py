@@ -52,6 +52,19 @@ def get_file_lang(file_stem):
         case _:
             return "pt-BR"
 
+
+class FilesForProcessing():
+    def __init__(self, languages):
+        pass
+
+    def add(lang):
+        pass
+
+    def pop(lang):
+        pass
+    
+    
+
 def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_files=False, ignore_hash=False):
 
     files_for_processing = {}
@@ -94,3 +107,46 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
                 files_for_processing[lang].append(file_path)
 
     return files_for_processing
+
+def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle):
+
+    # Loop until all files are processed
+    #TODO
+    while(files_for_processing.len() > 0)
+
+        # Load files until we don't have more capacity
+        for lang, audio_provider in audio_providers_per_lang.items():
+
+            # Load files until we run out of files or until we reach the maximum capacity
+            while( audio_provider.has_capacity() and len(files_for_processing[lang]) > 0):
+                input_file = files_for_processing[lang].pop()
+                output_file = pathlib.Path(input_file).with_suffix(".mp3") #TODO: make the file extension configurable
+                audio.run_task( input_file, output_file, lang, 16 ) #TODO: Make the retry_limit configurable
+
+        # What has finished?
+        # I haven't reused the previous loop bacause this allows all the files for all languages to be loaded first
+        for audio_provider in audio_providers_per_lang():
+
+            results = audio_provider.get_tasks_results()
+
+            # If all the tasks are still executing, an empty list will be returned. In which case, the for loop will be skipped
+            for task_res in results:
+
+                # Display information for the user
+                if task_res.status == audio_providers.TaskResult.FAIL:
+                    print(f"(FAIL) - command: {}")
+
+                if task_res.status == audio_providers.TaskResult.RETRY:
+                    print(f"(RETRY) - command: {} - Attempts: {}/{}")
+
+                if task_res.status == audio_providers.TaskResult.SUCCESS:
+                    print(f"(SUCCESS) - command: {}")
+                    #TODO
+                    # Append the file hash to the store, so other executions will skip it if unchanged
+                    # We can only do that AFTER the audio was generated (it also means that it can only occour in successful runs)
+                    file_hash_store_handle.append_to_file( f"{task_res.task.data["input_file"]}\t{get_file_hash(task_res.task.data["input_file"])}" )
+
+        # Wait sometime before querying the tasks again
+        # The "if" is usefull not only to prevent exceptions, but also in making tests faster
+        if polling_interval != 0:
+            Time.sleep(polling_interval)
