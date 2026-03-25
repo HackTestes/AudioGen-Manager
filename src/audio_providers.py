@@ -97,7 +97,24 @@ class AudioProvider():
 
         # Run and save the process handle
         # Grab any empty slot and assign a task to it
-        self.task_handles[ self.task_empty_slot.pop() ] = Task(current_command, retry_limit, {"input_file": input_file_path, "output_file": output_file_path})
+
+        # Use temporary slots, so if the subprocess raises an error, we can restore the state
+        # If we don't do that, it might leave the provider in an inconsistent state
+        empty_slot = self.task_empty_slot.pop()
+        task = None
+
+        try:
+            task = Task(current_command, retry_limit, {"input_file": input_file_path, "output_file": output_file_path})
+
+        except subprocess.SubprocessError, FileNotFoundError, Exception as e:
+            # Restore the state
+            # Return the empty store back
+            self.task_empty_slot.add(empty_slot)
+            print(e, file=sys.stderr)
+            raise e
+
+        # All good
+        self.task_handles[ empty_slot ] = task
 
     # Check if any task has:
     # - completed;

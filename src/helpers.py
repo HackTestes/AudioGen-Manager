@@ -54,16 +54,41 @@ def get_file_lang(file_stem):
 
 
 class FilesForProcessing():
-    def __init__(self, languages):
-        pass
+    def __init__(self, files_per_lang):
+        self.files_per_lang = files_per_lang
 
-    def add(lang):
-        pass
+    def add(self, lang):
+        return self.files_per_lang[lang].append()
 
-    def pop(lang):
-        pass
-    
-    
+    def pop(self, lang):
+        return self.files_per_lang[lang].pop()
+
+    def len(self, lang):
+        return len(self.files_per_lang[lang])
+
+    def total_len(self):
+        total_size = 0
+
+        for file_list in self.files_per_lang:
+            total_size = len(file_list)
+
+        return total_len
+
+def files_to_process_total_len(files_for_processing):
+
+    # Perform type checking to avoid runtime errors
+    if type(files_for_processing) not dict:
+        raise TypeError
+
+    total_size = 0
+
+    for file_list in self.files_per_lang:
+        if type(file_list) not list:
+            raise TypeError
+
+        total_size = len(file_list)
+
+    return total_len
 
 def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_files=False, ignore_hash=False):
 
@@ -106,13 +131,13 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
                 # Put the files in the correct language "bucket" for later processing
                 files_for_processing[lang].append(file_path)
 
-    return files_for_processing
+    return FilesForProcessing(files_for_processing)
 
-def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle):
+# The file_hash_store_handle must be opened in append only mode!
+def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle, retry_limit):
 
     # Loop until all files are processed
-    #TODO
-    while(files_for_processing.len() > 0)
+    while(files_to_process_total_len(files_for_processing) > 0)
 
         # Load files until we don't have more capacity
         for lang, audio_provider in audio_providers_per_lang.items():
@@ -121,7 +146,7 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
             while( audio_provider.has_capacity() and len(files_for_processing[lang]) > 0):
                 input_file = files_for_processing[lang].pop()
                 output_file = pathlib.Path(input_file).with_suffix(".mp3") #TODO: make the file extension configurable
-                audio.run_task( input_file, output_file, lang, 16 ) #TODO: Make the retry_limit configurable
+                audio.run_task( input_file, output_file, lang, retry_limit )
 
         # What has finished?
         # I haven't reused the previous loop bacause this allows all the files for all languages to be loaded first
@@ -134,17 +159,16 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
 
                 # Display information for the user
                 if task_res.status == audio_providers.TaskResult.FAIL:
-                    print(f"(FAIL) - command: {}")
+                    print(f"(FAIL) - command: {task_res.task.command} - return code: {task_res.return_code}")
 
                 if task_res.status == audio_providers.TaskResult.RETRY:
-                    print(f"(RETRY) - command: {} - Attempts: {}/{}")
+                    print(f"(RETRY) - command: {task_res.task.command} - Attempts: {task_res.task.retry_attempts}/{task_res.task.retry_limit}")
 
                 if task_res.status == audio_providers.TaskResult.SUCCESS:
-                    print(f"(SUCCESS) - command: {}")
-                    #TODO
-                    # Append the file hash to the store, so other executions will skip it if unchanged
+                    print(f"(SUCCESS) - command: {task_res.task.command}")
+                    # Append the file hash to the store, so other executions will skip it if it remains unchanged
                     # We can only do that AFTER the audio was generated (it also means that it can only occour in successful runs)
-                    file_hash_store_handle.append_to_file( f"{task_res.task.data["input_file"]}\t{get_file_hash(task_res.task.data["input_file"])}" )
+                    file_hash_store_handle.write( f"{task_res.task.data["input_file"]}\t{get_file_hash(task_res.task.data["input_file"])}" )
 
         # Wait sometime before querying the tasks again
         # The "if" is usefull not only to prevent exceptions, but also in making tests faster
