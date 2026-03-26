@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import shlex, subprocess
+import sys
 
 class AudioProvider_LanguageNotSupported(Exception):
     pass
@@ -15,7 +16,7 @@ class TaskSatus(Enum):
     RETRY = 3
 
 class TaskResult():
-    def __init__(self, status, return_code, data):
+    def __init__(self, status, return_code, task):
         self.status = status
         self.return_code = return_code
         self.task = task
@@ -48,7 +49,7 @@ class Task():
 
     def can_retry(self):
 
-        if self.retry_attempts + 1 > self.retry_limit
+        if self.retry_attempts + 1 > self.retry_limit:
             return False
 
         return True
@@ -90,10 +91,10 @@ class AudioProvider():
         current_command = self.commands[lang]
 
         # Replace the input file field - the command must contain a "[input_file_path]"
-        current_command = current_command.replace("\"[input_file_path]\"", input_file_path)
+        current_command = current_command.replace("[input_file_path]", f"\"{input_file_path}\"")
 
         # Replace the output file field - the command must contain a "[output_file_path]"
-        current_command = current_command.replace("\"[output_file_path]\"", output_file_path)
+        current_command = current_command.replace("[output_file_path]", f"\"{output_file_path}\"")
 
         # Run and save the process handle
         # Grab any empty slot and assign a task to it
@@ -106,7 +107,7 @@ class AudioProvider():
         try:
             task = Task(current_command, retry_limit, {"input_file": input_file_path, "output_file": output_file_path})
 
-        except subprocess.SubprocessError, FileNotFoundError, Exception as e:
+        except Exception as e:
             # Restore the state
             # Return the empty store back
             self.task_empty_slot.add(empty_slot)
@@ -127,8 +128,12 @@ class AudioProvider():
 
         for idx, task in enumerate(self.task_handles):
 
+            # There is no task here
+            if task == None:
+                continue
+
             # Did it finish?
-            if task.poll() == None
+            if task.poll() == None:
                 # It did not
                 continue
 

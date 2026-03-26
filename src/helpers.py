@@ -52,38 +52,16 @@ def get_file_lang(file_stem):
         case _:
             return "pt-BR"
 
-
-class FilesForProcessing():
-    def __init__(self, files_per_lang):
-        self.files_per_lang = files_per_lang
-
-    def add(self, lang):
-        return self.files_per_lang[lang].append()
-
-    def pop(self, lang):
-        return self.files_per_lang[lang].pop()
-
-    def len(self, lang):
-        return len(self.files_per_lang[lang])
-
-    def total_len(self):
-        total_size = 0
-
-        for file_list in self.files_per_lang:
-            total_size = len(file_list)
-
-        return total_len
-
 def files_to_process_total_len(files_for_processing):
 
     # Perform type checking to avoid runtime errors
-    if type(files_for_processing) not dict:
+    if type(files_for_processing) is not dict:
         raise TypeError
 
     total_size = 0
 
     for file_list in self.files_per_lang:
-        if type(file_list) not list:
+        if type(file_list) is not list:
             raise TypeError
 
         total_size = len(file_list)
@@ -101,7 +79,7 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
     for (root,dirs,files) in os.walk(text_path, topdown=True):
 
         # Look only for txt files
-        if pathlib.Path(file).suffix == ".txt"
+        if pathlib.Path(file).suffix == ".txt":
 
             file_path = f"{root}/{file_stem}.txt"
             with open(file_path, "r", encoding="UTF-8") as file_handle:
@@ -123,7 +101,7 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
                     # It means that it was already processed (even though it does not have a audio file)
                     continue
 
-                # So this is a new file without any audio, generate the audio then!
+                # So this is a new file without any audio
 
                 # Get the lang
                 lang = get_file_lang(file_stem)
@@ -137,7 +115,7 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
 def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle, retry_limit):
 
     # Loop until all files are processed
-    while(files_to_process_total_len(files_for_processing) > 0)
+    while(files_to_process_total_len(files_for_processing) > 0):
 
         # Load files until we don't have more capacity
         for lang, audio_provider in audio_providers_per_lang.items():
