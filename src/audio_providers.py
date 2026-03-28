@@ -72,13 +72,8 @@ class AudioProvider():
         self.commands = commands
         self.execution_limit = execution_limit
         self.remote = remote
-        self.task_handles = []
-        self.task_empty_slot = set()
-
-        # Populate the "buffers"/slots
-        for i in range(0, execution_limit):
-            self.task_handles.append(None) # Represents an empty task slot
-            self.task_empty_slot.add(i) # Represents the indexes of empty slots
+        self.task_handles = [None]*execution_limit # Represents an empty task slot
+        self.task_empty_slot = set( range(0, execution_limit) ) # Represents the indexes of empty slots
 
     # Grab any empty slot and assign a task to it
     def add_task(self, task):
