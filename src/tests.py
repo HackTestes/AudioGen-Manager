@@ -15,6 +15,89 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(audio_provider.task_empty_slot, set([0, 1]))
 
     @unittest.mock.patch('subprocess.Popen')
+    def test_audio_provider_regular_case(self, popen_mock):
+
+        capacity = 1
+        audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path] [output_file_path]"}, capacity, False)
+
+        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 2)
+
+        # Simulate an unfinshed process
+        popen_mock.return_value.poll.return_value = None
+
+        results = audio_provider.get_tasks_results()
+        self.assertEqual(0, len(results))
+
+        # Simulate a fail for retry
+        popen_mock.return_value.poll.return_value = 1
+
+        results = audio_provider.get_tasks_results()
+        self.assertEqual(1, len(results))
+        self.assertEqual(audio_providers.TaskSatus.RETRY, results[0].status)
+        self.assertEqual(1, results[0].return_code)
+
+        # Simulate a successful finish
+        popen_mock.return_value.poll.return_value = 0
+
+        results = audio_provider.get_tasks_results()
+        self.assertEqual(1, len(results))
+        self.assertEqual(audio_providers.TaskSatus.SUCCESS, results[0].status)
+        self.assertEqual(0, results[0].return_code)
+
+        # Is the audio provider in a good state?
+        self.assertEqual(len(audio_provider.task_empty_slot), capacity)
+        self.assertEqual(audio_provider.has_capacity(), True)
+
+    @unittest.mock.patch('subprocess.Popen')
+    def test_audio_provider_popen_error_on_retry(self, popen_mock):
+
+        capacity = 3
+        audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path] [output_file_path]"}, capacity, False)
+
+        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
+
+        # Simulate a fail for retry
+        popen_mock.return_value.poll.return_value = 1
+
+        # Raise an error during the retry
+        popen_mock.side_effect = FileNotFoundError
+
+        results = audio_provider.get_tasks_results()
+        self.assertEqual(1, len(results))
+        self.assertTrue(isinstance(results[0].exception, FileNotFoundError))
+
+        # Is the audio provider in a good state?
+        self.assertEqual(len(audio_provider.task_empty_slot), capacity)
+        self.assertEqual(audio_provider.has_capacity(), True)
+
+    @unittest.mock.patch('subprocess.Popen')
+    def test_audio_provider_retry_until_failure(self, popen_mock):
+
+        capacity = 3
+        audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path] [output_file_path]"}, capacity, False)
+
+        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 1)
+        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 1)
+
+        # Simulate a fail for retry
+        popen_mock.return_value.poll.return_value = 1
+
+        results = audio_provider.get_tasks_results()
+        self.assertEqual(2, len(results))
+        self.assertEqual(audio_providers.TaskSatus.RETRY, results[0].status)
+        self.assertEqual(1, results[0].return_code)
+
+        results = audio_provider.get_tasks_results()
+        self.assertEqual(2, len(results))
+        self.assertEqual(audio_providers.TaskSatus.FAIL, results[0].status)
+        self.assertEqual(1, results[0].return_code)
+
+        # Is the audio provider in a good state?
+        self.assertEqual(len(audio_provider.task_empty_slot), capacity)
+        self.assertEqual(audio_provider.has_capacity(), True)
+
+
+    @unittest.mock.patch('subprocess.Popen')
     def test_audio_provider_command_replacement(self, popen_mock):
 
         capacity = 1

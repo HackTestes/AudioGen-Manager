@@ -16,10 +16,11 @@ class TaskSatus(Enum):
     RETRY = 3
 
 class TaskResult():
-    def __init__(self, status, return_code, task):
+    def __init__(self, status, return_code, task, exception=None):
         self.status = status
         self.return_code = return_code
         self.task = task
+        self.exception = exception
 
 # This is responsible for managing a single subprocess
 # It will hold critical information to help manage the task (like what was run, how many retries were made...)
@@ -79,6 +80,15 @@ class AudioProvider():
             self.task_handles.append(None) # Represents an empty task slot
             self.task_empty_slot.add(i) # Represents the indexes of empty slots
 
+    # Grab any empty slot and assign a task to it
+    def add_task(self, task):
+        empty_slot = self.task_empty_slot.pop()
+        self.task_handles[ empty_slot ] = task
+
+    def free_task(self, task_idx):
+        self.task_empty_slot.add(task_idx)
+        self.task_handles[task_idx] = None
+
     # Adds a task to be executed by the provider
     def run_task(self, input_file_path, output_file_path, lang, retry_limit):
 
@@ -96,26 +106,11 @@ class AudioProvider():
         # Replace the output file field - the command must contain a "[output_file_path]"
         current_command = current_command.replace("[output_file_path]", f"\"{output_file_path}\"")
 
-        # Run and save the process handle
-        # Grab any empty slot and assign a task to it
+        task = Task(current_command, retry_limit, {"input_file": input_file_path, "output_file": output_file_path})
 
-        # Use temporary slots, so if the subprocess raises an error, we can restore the state
-        # If we don't do that, it might leave the provider in an inconsistent state
-        empty_slot = self.task_empty_slot.pop()
-        task = None
-
-        try:
-            task = Task(current_command, retry_limit, {"input_file": input_file_path, "output_file": output_file_path})
-
-        except Exception as e:
-            # Restore the state
-            # Return the empty store back
-            self.task_empty_slot.add(empty_slot)
-            print(e, file=sys.stderr)
-            raise e
-
-        # All good
-        self.task_handles[ empty_slot ] = task
+        # We only assign the task after opening the process,
+        # so we don't leave the obj in an inconsistent state if it errors
+        self.add_task(task)
 
     # Check if any task has:
     # - completed;
@@ -144,16 +139,25 @@ class AudioProvider():
                 # Can we retry?
                 if task.can_retry():
                     # Yes, then retry
-                    task.retry()
-                    tasks_info.append( TaskResult(TaskSatus.RETRY, None, task.data()) )
+                    try:
+                        task.retry()
+                        tasks_info.append( TaskResult(TaskSatus.RETRY, task.poll(), task.data()) )
+                    
+                    # An error occurred dung the retry (in a new popen call)
+                    # Consider the task as failed
+                    # Why catch almost everything? I want the program to process as much as possible without human intervention
+                    # And exception could cause the process to close. So it is preferable to just get the error and continue on
+                    except Exception as e:
+                        self.free_task(idx)
+                        # Since the process couldn't even be created, it wasn't able to return eny code, so "None"
+                        tasks_info.append( TaskResult(TaskSatus.FAIL, None, task.data(), e) )
                     continue
 
                 # We can't retry anymore
                 else:
 
                     # Free the slot
-                    self.task_handles[idx] = None
-                    self.task_empty_slot.add(idx)
+                    self.free_task(idx)
 
                     tasks_info.append( TaskResult(TaskSatus.FAIL, task.poll(), task.data()) )
                     continue
@@ -162,10 +166,9 @@ class AudioProvider():
             if task.poll() == 0:
 
                 # Free the slot
-                self.task_handles[idx] = None
-                self.task_empty_slot.add(idx)
+                self.free_task(idx)
 
-                tasks_info.append( TaskResult(TaskSatus.SUCESS, task.poll(), task.data()) )
+                tasks_info.append( TaskResult(TaskSatus.SUCCESS, task.poll(), task.data()) )
                 continue
 
         return tasks_info
