@@ -1,3 +1,6 @@
+import os
+import pathlib
+import hashlib
 
 class TsvParser_InvalidHashFile(Exception):
     pass
@@ -14,18 +17,35 @@ def tsv_to_dict(tsv_content_str):
     # The hash is the value
     path_hash_pair = {}
 
+    # Avoid getting empty rows
+    tsv_content_str = tsv_content_str.strip()
+
     rows = tsv_content_str.split("\n")
 
     for row in rows:
+
+        # Just skip possible empty rows
+        if len(row) == 0:
+            continue
+
         columns_value = row.split("\t")
 
         # There should only be two values
-        if len(columns_value) != 0:
+        if len(columns_value) != 2:
             raise TsvParser_InvalidHashFile
 
         path_hash_pair[ columns_value[0] ] = columns_value[1]
 
     return path_hash_pair
+
+# Assume a "flat" dict (a simple key value - file:hash)
+def dict_to_tsv(dictionary):
+    tsv_str = ""
+
+    for key, value in dictionary.items():
+        tsv_str += f"{key}\t{value}\n"
+
+    return tsv_str.strip()
 
 def read_hash_store(hash_store_path):
     with open(hash_store_path, "r", encoding="UTF-8") as hf:
@@ -33,8 +53,8 @@ def read_hash_store(hash_store_path):
 
 # Opening the same file multiple times isn't good for performance, but doing it any other way makes the code confusing
 def get_file_hash(path):
-    with open(path, "r", encoding="UTF-8") as file_handle:
-        hashlib.file_digest(file_handle, "sha256").hexdigest()
+    with open(path, "rb") as file_handle:
+        return hashlib.file_digest(file_handle, "sha256").hexdigest()
 
 # The files have the language written at the end og the file like this: '*_pt-BR', '*_en-US'
 # However, some don't. In this case, consider them pt-BR
@@ -68,48 +88,73 @@ def files_to_process_total_len(files_for_processing):
 
     return total_len
 
+class Workload():
+    def __init__(self, files_that_need_processing, files_unchanged):
+        self.files_need_processing = files_that_need_processing
+        self.files_unchanged = files_unchanged
+
+
 def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_files=False, ignore_hash=False):
 
     files_for_processing = {}
+    unchanged_files = {}
 
     # Populate the variable with language specific lists
     for lang in languages:
         files_for_processing[lang] = []
 
     for (root,dirs,files) in os.walk(text_path, topdown=True):
+        for file in files:
 
-        # Look only for txt files
-        if pathlib.Path(file).suffix == ".txt":
-
-            file_path = f"{root}/{file_stem}.txt"
-            with open(file_path, "r", encoding="UTF-8") as file_handle:
+            # Look only for txt files
+            if pathlib.Path(file).suffix == ".txt":
 
                 file_stem = pathlib.Path(file).stem # The name without the path or the suffix (folder/text.txt -> text)
+                file_path = f"{root}/{file_stem}.txt"
 
-                # Do they have a corresponding audio file (mp3, wav)?
-                if (pathlib.Path(f"{root}/{file_stem}.mp3").exists() or pathlib.Path(f"{root}/{file_stem}.mp3").exists()) and not ignore_audio_files:
+                with open(file_path, "r", encoding="UTF-8") as file_handle:
 
-                    # Do not overwrite the audio files, so continue
-                    continue
+                    # Do they have a corresponding audio file (mp3, wav)?
+                    if (pathlib.Path(f"{root}/{file_stem}.mp3").exists() or pathlib.Path(f"{root}/{file_stem}.mp3").exists()) and not ignore_audio_files:
 
-                # Have they changed since the last execution (aka is their hash different or is it absent from the store)?
-                file_hash = get_file_hash(file_path)
+                        # Do not overwrite the audio files, so continue
+                        continue
 
-                if file_hash in file_hash_store and file_hash == file_hash_store[file_path] and not ignore_hash:
+                    # Have they changed since the last execution (aka is their hash different or is it absent from the store)?
+                    file_hash = get_file_hash(file_path)
 
-                    # The file exists in the store and hasn't changed
-                    # It means that it was already processed (even though it does not have a audio file)
-                    continue
+                    if file_path in file_hash_store and file_hash == file_hash_store[file_path] and not ignore_hash:
 
-                # So this is a new file without any audio
+                        # The file exists in the store and hasn't changed
+                        # It means that it was already processed (even though it does not have a audio file)
+                        unchanged_files[ file_path ] = file_hash
+                        continue
 
-                # Get the lang
-                lang = get_file_lang(file_stem)
+                    # So this is a new file without any audio
 
-                # Put the files in the correct language "bucket" for later processing
-                files_for_processing[lang].append(file_path)
+                    # Get the lang
+                    lang = get_file_lang(file_stem)
 
-    return FilesForProcessing(files_for_processing)
+                    # Put the files in the correct language "bucket" for later processing
+                    files_for_processing[lang].append(file_path)
+
+    return Workload(files_for_processing, unchanged_files)
+
+def update_hash_store(file_hash_store, unchanged_files, file_hash_store_write_handle):
+
+    accepted_modes = {"w", "w+", "rw+"}
+    if file_hash_store_write_handle.mode in accepted_modes:
+        raise InvalidFileHandleMode
+
+    # If they have the same elements; these elements are the same and they have the same amount, then they are the same (think of sets)
+    if len(file_hash_store) == len(unchanged_files):
+        # In this case we don't need to update anything on the file
+        return
+
+    # Some things have changed, we need to remove the changed entries
+    # We can also just insert the unchanged files
+    file_hash_store_handle.truncate(0)
+    file_hash_store_handle.write( dict_to_tsv(unchanged_files) )
 
 # The file_hash_store_handle must be opened in append only mode!
 def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle, retry_limit):

@@ -4,7 +4,97 @@ import copy
 import helpers
 import audio_providers
 
+# The hashes are all the same, because all of them are empty files
+# sha256
+precomputed_hash_store = {
+            "./test_data/texts/file_hashed_001.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "./test_data/texts/file_hashed_002.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "./test_data/texts/file_hashed_003.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        }
+
 class TestMethods(unittest.TestCase):
+
+    def test_read_hash_store(self):
+        parsed_hash_store = helpers.read_hash_store("./test_data/file_hash_store.tsv")
+        self.assertEqual(parsed_hash_store, precomputed_hash_store)
+
+    def test_get_files_to_gen_audio_regular_case(self):
+
+        workload = helpers.get_files_to_gen_audio("./test_data/texts", precomputed_hash_store, ["pt-BR", "en-US"])
+        self.assertEqual(workload.files_need_processing, {
+            "pt-BR": ["./test_data/texts/file.txt", "./test_data/texts/file_pt-BR.txt"],
+            "en-US": ["./test_data/texts/file_en-US.txt"]
+        })
+        self.assertEqual(workload.files_unchanged, precomputed_hash_store)
+
+    def test_get_files_to_gen_audio_ignore_hash_store(self):
+
+        workload = helpers.get_files_to_gen_audio("./test_data/texts", precomputed_hash_store, ["pt-BR", "en-US"], ignore_hash=True)
+        self.assertEqual(workload.files_need_processing, {
+            "pt-BR": ["./test_data/texts/file.txt", "./test_data/texts/file_hashed_001.txt", "./test_data/texts/file_hashed_002.txt", "./test_data/texts/file_hashed_003.txt", "./test_data/texts/file_pt-BR.txt"],
+            "en-US": ["./test_data/texts/file_en-US.txt"]
+        })
+        self.assertEqual(workload.files_unchanged, {})
+
+    def test_get_files_to_gen_audio_ignore_audio_file(self):
+
+        workload = helpers.get_files_to_gen_audio("./test_data/texts", precomputed_hash_store, ["pt-BR", "en-US"], ignore_audio_files=True)
+        self.assertEqual(workload.files_need_processing, {
+            "pt-BR": ["./test_data/texts/file.txt", "./test_data/texts/file_002.txt", "./test_data/texts/file_003.txt", "./test_data/texts/file_pt-BR.txt"],
+            "en-US": ["./test_data/texts/file_en-US.txt"]
+        })
+        self.assertEqual(workload.files_unchanged, precomputed_hash_store)
+
+
+    def test_tsv_to_dict(self):
+        tsv_str = ("./project_root/texts/file\t0000000000\n"
+                "./project_root/texts/file_002\t0000000000\n"
+                "./project_root/texts/file_003\t0000000000\n"
+                "\n\n\n"
+        )
+
+        expect = {
+            "./project_root/texts/file": "0000000000",
+            "./project_root/texts/file_002": "0000000000",
+            "./project_root/texts/file_003": "0000000000"
+        }
+
+        self.assertEqual(helpers.tsv_to_dict(tsv_str), expect)
+
+    def test_tsv_to_dict_skip_empty_rows(self):
+        tsv_str = ("./project_root/texts/file\t0000000000\n"
+                "./project_root/texts/file_002\t0000000000\n"
+                "\n\n\n"
+                "./project_root/texts/file_003\t0000000000\n"
+                "\n\n\n"
+        )
+
+        expect = {
+            "./project_root/texts/file": "0000000000",
+            "./project_root/texts/file_002": "0000000000",
+            "./project_root/texts/file_003": "0000000000"
+        }
+
+        self.assertEqual(helpers.tsv_to_dict(tsv_str), expect)
+
+    def test_dict_to_tsv(self):
+        expect = ("./project_root/texts/file\t0000000000\n"
+                "./project_root/texts/file_002\t0000000000\n"
+                "./project_root/texts/file_003\t0000000000"
+        )
+
+        dictionary = {
+            "./project_root/texts/file": "0000000000",
+            "./project_root/texts/file_002": "0000000000",
+            "./project_root/texts/file_003": "0000000000"
+        }
+
+        self.assertEqual(helpers.dict_to_tsv(dictionary), expect)
+
+    def test_get_file_lang(self):
+        self.assertEqual(helpers.get_file_lang("file"), "pt-BR")
+        self.assertEqual(helpers.get_file_lang("file_en-US"), "en-US")
+        self.assertEqual(helpers.get_file_lang("file_pt-BR"), "pt-BR")
 
     def test_audio_provider_creation(self):
 
@@ -14,7 +104,7 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(audio_provider.task_handles, [None]*2)
         self.assertEqual(audio_provider.task_empty_slot, set([0, 1]))
 
-    @unittest.mock.patch('subprocess.Popen')
+    @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_regular_case(self, popen_mock):
 
         capacity = 1
@@ -48,7 +138,7 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(len(audio_provider.task_empty_slot), capacity)
         self.assertEqual(audio_provider.has_capacity(), True)
 
-    @unittest.mock.patch('subprocess.Popen')
+    @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_popen_error_on_retry(self, popen_mock):
 
         capacity = 3
@@ -70,7 +160,7 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(len(audio_provider.task_empty_slot), capacity)
         self.assertEqual(audio_provider.has_capacity(), True)
 
-    @unittest.mock.patch('subprocess.Popen')
+    @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_retry_until_failure(self, popen_mock):
 
         capacity = 3
@@ -97,7 +187,7 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(audio_provider.has_capacity(), True)
 
 
-    @unittest.mock.patch('subprocess.Popen')
+    @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_command_replacement(self, popen_mock):
 
         capacity = 1
@@ -108,7 +198,7 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(audio_provider.task_handles[0].command, "echo \"input/file/path\" \"output/file/path\"")
 
     # Does a popen error cause the AudioProvider to be in a broken state?
-    @unittest.mock.patch('subprocess.Popen')
+    @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_popen_error_state(self, popen_mock):
 
         capacity = 1
@@ -126,7 +216,7 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(audio_provider.has_capacity(), True)
 
 
-    @unittest.mock.patch('subprocess.Popen')
+    @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_capacity(self, popen_mock):
 
         capacity = 2
@@ -145,7 +235,7 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(len(audio_provider.task_empty_slot), 0)
         self.assertEqual(audio_provider.has_capacity(), False)
 
-    @unittest.mock.patch('subprocess.Popen')
+    @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_error_no_capacity_left(self, popen_mock):
 
         capacity = 1
@@ -162,7 +252,7 @@ class TestMethods(unittest.TestCase):
         with self.assertRaises(audio_providers.AudioProvider_NoCapacityLeft) as e:
             audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
 
-    @unittest.mock.patch('subprocess.Popen')
+    @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_error_lang_not_supported(self, popen_mock):
 
         capacity = 1
@@ -172,5 +262,5 @@ class TestMethods(unittest.TestCase):
             audio_provider.run_task("input/file/path", "output/file/path", "invalid-lang", 5)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
