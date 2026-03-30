@@ -14,9 +14,53 @@ precomputed_hash_store = {
 
 class TestMethods(unittest.TestCase):
 
+    @unittest.mock.patch("subprocess.Popen")
+    def test_process_text_files_regular_case(self, popen_mock):
+
+        polling_interval = 0
+        retry_limit = 3
+        file_hash_store_handle_mock = unittest.mock.mock_open()() # Creates the open mock an then tries to "open" a file
+        workload = helpers.get_files_to_gen_audio("./test_data/texts", precomputed_hash_store, ["pt-BR", "en-US"])
+        pt_BR_audio_provider = audio_providers.AudioProvider({"pt-BR": "echo pt-BR [input_file_path] [output_file_path]"}, 1, False)
+        en_US_audio_provider = audio_providers.AudioProvider({"en-US": "echo en-US   [input_file_path] [output_file_path]"}, 1, False)
+
+        audio_providers_per_lang = {"pt-BR": pt_BR_audio_provider, "en-US": en_US_audio_provider}
+
+        # Success
+        # This means that every call will succeed
+        popen_mock.return_value.poll.return_value = 0
+
+        helpers.process_text_files(workload.files_need_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle_mock, retry_limit)
+
+        popen_mock.assert_called()
+        file_hash_store_handle_mock.write.assert_has_calls([
+            unittest.mock.call("./test_data/texts/file_pt-BR.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n"),
+            unittest.mock.call("./test_data/texts/file_en-US.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n"),
+            unittest.mock.call("./test_data/texts/file.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n")
+        ])
+
+
     def test_read_hash_store(self):
         parsed_hash_store = helpers.read_hash_store("./test_data/file_hash_store.tsv")
         self.assertEqual(parsed_hash_store, precomputed_hash_store)
+
+    def test_update_hash_store_needs_update(self):
+        parsed_hash_store = helpers.read_hash_store("./test_data/file_hash_store.tsv")
+        parsed_hash_store.popitem()
+
+        file_handle_mock = unittest.mock.mock_open()() # Creates the open mock an then tries to "open" a file
+
+        helpers.update_hash_store(precomputed_hash_store, parsed_hash_store, file_handle_mock)
+        file_handle_mock.truncate.assert_called_with(0)
+        file_handle_mock.write.assert_called()
+        file_handle_mock.write.assert_called_with( helpers.dict_to_tsv(parsed_hash_store) )
+
+    def test_update_hash_store_no_update(self):
+
+        file_handle_mock = unittest.mock.mock_open()() # Creates the open mock an then tries to "open" a file
+
+        helpers.update_hash_store(precomputed_hash_store, precomputed_hash_store, file_handle_mock)
+        file_handle_mock.write.assert_not_called()
 
     def test_get_files_to_gen_audio_regular_case(self):
 

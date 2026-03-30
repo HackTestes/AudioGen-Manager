@@ -1,6 +1,7 @@
 import os
 import pathlib
 import hashlib
+import audio_providers
 
 class TsvParser_InvalidHashFile(Exception):
     pass
@@ -72,21 +73,22 @@ def get_file_lang(file_stem):
         case _:
             return "pt-BR"
 
-def files_to_process_total_len(files_for_processing):
+def files_to_process_total_len(files_per_lang):
 
     # Perform type checking to avoid runtime errors
-    if type(files_for_processing) is not dict:
+    if type(files_per_lang) is not dict:
         raise TypeError
 
     total_size = 0
 
-    for file_list in self.files_per_lang:
+    for file_list in files_per_lang.values():
+
         if type(file_list) is not list:
             raise TypeError
 
-        total_size = len(file_list)
+        total_size += len(file_list)
 
-    return total_len
+    return total_size
 
 class Workload():
     def __init__(self, files_that_need_processing, files_unchanged):
@@ -142,19 +144,16 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
 
 def update_hash_store(file_hash_store, unchanged_files, file_hash_store_write_handle):
 
-    accepted_modes = {"w", "w+", "rw+"}
-    if file_hash_store_write_handle.mode in accepted_modes:
-        raise InvalidFileHandleMode
-
-    # If they have the same elements; these elements are the same and they have the same amount, then they are the same (think of sets)
+    # If they have the same elements; these elements are the same and they have the same amount, then they are the same (think of sets in math)
+    # We only check this last condition in here
     if len(file_hash_store) == len(unchanged_files):
         # In this case we don't need to update anything on the file
         return
 
     # Some things have changed, we need to remove the changed entries
     # We can also just insert the unchanged files
-    file_hash_store_handle.truncate(0)
-    file_hash_store_handle.write( dict_to_tsv(unchanged_files) )
+    file_hash_store_write_handle.truncate(0) # Clear the file
+    file_hash_store_write_handle.write( dict_to_tsv(unchanged_files) )
 
 # The file_hash_store_handle must be opened in append only mode!
 def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle, retry_limit):
@@ -163,35 +162,38 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
     while(files_to_process_total_len(files_for_processing) > 0):
 
         # Load files until we don't have more capacity
-        for lang, audio_provider in audio_providers_per_lang.items():
+        for lang, audio_prov in audio_providers_per_lang.items():
 
             # Load files until we run out of files or until we reach the maximum capacity
-            while( audio_provider.has_capacity() and len(files_for_processing[lang]) > 0):
+            while( audio_prov.has_capacity() and len(files_for_processing[lang]) > 0):
                 input_file = files_for_processing[lang].pop()
-                output_file = pathlib.Path(input_file).with_suffix(".mp3") #TODO: make the file extension configurable
-                audio.run_task( input_file, output_file, lang, retry_limit )
+                output_file = input_file.replace(".txt", ".mp3") #TODO: make the file extension configurable
+                audio_prov.run_task( input_file, output_file, lang, retry_limit )
 
         # What has finished?
         # I haven't reused the previous loop bacause this allows all the files for all languages to be loaded first
-        for audio_provider in audio_providers_per_lang():
+        for audio_prov in audio_providers_per_lang.values():
 
-            results = audio_provider.get_tasks_results()
+            results = audio_prov.get_tasks_results()
 
             # If all the tasks are still executing, an empty list will be returned. In which case, the for loop will be skipped
             for task_res in results:
 
+                print(task_res.task.task_data)
+
                 # Display information for the user
-                if task_res.status == audio_providers.TaskResult.FAIL:
+                if task_res.status == audio_providers.TaskSatus.FAIL:
                     print(f"(FAIL) - command: {task_res.task.command} - return code: {task_res.return_code}")
 
-                if task_res.status == audio_providers.TaskResult.RETRY:
+                if task_res.status == audio_providers.TaskSatus.RETRY:
                     print(f"(RETRY) - command: {task_res.task.command} - Attempts: {task_res.task.retry_attempts}/{task_res.task.retry_limit}")
 
-                if task_res.status == audio_providers.TaskResult.SUCCESS:
+                if task_res.status == audio_providers.TaskSatus.SUCCESS:
                     print(f"(SUCCESS) - command: {task_res.task.command}")
                     # Append the file hash to the store, so other executions will skip it if it remains unchanged
                     # We can only do that AFTER the audio was generated (it also means that it can only occour in successful runs)
-                    file_hash_store_handle.write( f"{task_res.task.data["input_file"]}\t{get_file_hash(task_res.task.data["input_file"])}" )
+                    file_hash_store_handle.seek(0, os.SEEK_END) # Put the file cursor always at the end
+                    file_hash_store_handle.write( f"{task_res.task.task_data["input_file"]}\t{get_file_hash(task_res.task.task_data["input_file"])}\n" )
 
         # Wait sometime before querying the tasks again
         # The "if" is usefull not only to prevent exceptions, but also in making tests faster

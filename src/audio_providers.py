@@ -136,7 +136,7 @@ class AudioProvider():
                     # Yes, then retry
                     try:
                         task.retry()
-                        tasks_info.append( TaskResult(TaskSatus.RETRY, task.poll(), task.data()) )
+                        tasks_info.append( TaskResult(TaskSatus.RETRY, task.poll(), task) )
                     
                     # An error occurred dung the retry (in a new popen call)
                     # Consider the task as failed
@@ -145,7 +145,7 @@ class AudioProvider():
                     except Exception as e:
                         self.free_task(idx)
                         # Since the process couldn't even be created, it wasn't able to return eny code, so "None"
-                        tasks_info.append( TaskResult(TaskSatus.FAIL, None, task.data(), e) )
+                        tasks_info.append( TaskResult(TaskSatus.FAIL, None, task, e) )
                     continue
 
                 # We can't retry anymore
@@ -154,7 +154,7 @@ class AudioProvider():
                     # Free the slot
                     self.free_task(idx)
 
-                    tasks_info.append( TaskResult(TaskSatus.FAIL, task.poll(), task.data()) )
+                    tasks_info.append( TaskResult(TaskSatus.FAIL, task.poll(), task) )
                     continue
 
             # Did it finish successfully?
@@ -163,7 +163,7 @@ class AudioProvider():
                 # Free the slot
                 self.free_task(idx)
 
-                tasks_info.append( TaskResult(TaskSatus.SUCCESS, task.poll(), task.data()) )
+                tasks_info.append( TaskResult(TaskSatus.SUCCESS, task.poll(), task) )
                 continue
 
         return tasks_info
