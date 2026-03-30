@@ -174,5 +174,8 @@ class AudioProvider():
         if len(self.task_handles)-len(self.task_empty_slot) < self.execution_limit:
             return True
 
+    def has_finished(self):
+        return len(self.task_handles) == len(self.task_empty_slot)
+
         return False
 

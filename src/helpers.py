@@ -2,6 +2,7 @@ import os
 import pathlib
 import hashlib
 import audio_providers
+import time
 
 class TsvParser_InvalidHashFile(Exception):
     pass
@@ -155,11 +156,22 @@ def update_hash_store(file_hash_store, unchanged_files, file_hash_store_write_ha
     file_hash_store_write_handle.truncate(0) # Clear the file
     file_hash_store_write_handle.write( dict_to_tsv(unchanged_files) )
 
+def all_audio_providers_finish(audio_providers_per_lang):
+
+    for audio_provider in audio_providers_per_lang.values():
+        if audio_provider.has_finished() != True:
+            return False
+
+    return True
+
 # The file_hash_store_handle must be opened in append only mode!
 def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle, retry_limit):
 
+    files_processed = 0
+    file_count = files_to_process_total_len(files_for_processing)
+
     # Loop until all files are processed
-    while(files_to_process_total_len(files_for_processing) > 0):
+    while(files_to_process_total_len(files_for_processing) > 0 or files_processed < file_count):
 
         # Load files until we don't have more capacity
         for lang, audio_prov in audio_providers_per_lang.items():
@@ -168,6 +180,7 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
             while( audio_prov.has_capacity() and len(files_for_processing[lang]) > 0):
                 input_file = files_for_processing[lang].pop()
                 output_file = input_file.replace(".txt", ".mp3") #TODO: make the file extension configurable
+                print(f"Trying to run: {input_file} --> {output_file}")
                 audio_prov.run_task( input_file, output_file, lang, retry_limit )
 
         # What has finished?
@@ -178,8 +191,6 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
 
             # If all the tasks are still executing, an empty list will be returned. In which case, the for loop will be skipped
             for task_res in results:
-
-                print(task_res.task.task_data)
 
                 # Display information for the user
                 if task_res.status == audio_providers.TaskSatus.FAIL:
@@ -195,7 +206,9 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
                     file_hash_store_handle.seek(0, os.SEEK_END) # Put the file cursor always at the end
                     file_hash_store_handle.write( f"{task_res.task.task_data["input_file"]}\t{get_file_hash(task_res.task.task_data["input_file"])}\n" )
 
+                files_processed += 1
+
         # Wait sometime before querying the tasks again
         # The "if" is usefull not only to prevent exceptions, but also in making tests faster
         if polling_interval != 0:
-            Time.sleep(polling_interval)
+            time.sleep(polling_interval)
