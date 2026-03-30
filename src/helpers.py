@@ -168,10 +168,10 @@ def all_audio_providers_finish(audio_providers_per_lang):
 def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle, retry_limit):
 
     files_processed = 0
-    file_count = files_to_process_total_len(files_for_processing)
+    total_file_count = files_to_process_total_len(files_for_processing)
 
     # Loop until all files are processed
-    while(files_to_process_total_len(files_for_processing) > 0 or files_processed < file_count):
+    while(files_processed < total_file_count):
 
         # Load files until we don't have more capacity
         for lang, audio_prov in audio_providers_per_lang.items():
@@ -195,6 +195,7 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
                 # Display information for the user
                 if task_res.status == audio_providers.TaskSatus.FAIL:
                     print(f"(FAIL) - command: {task_res.task.command} - return code: {task_res.return_code}")
+                    files_processed += 1
 
                 if task_res.status == audio_providers.TaskSatus.RETRY:
                     print(f"(RETRY) - command: {task_res.task.command} - Attempts: {task_res.task.retry_attempts}/{task_res.task.retry_limit}")
@@ -206,7 +207,7 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
                     file_hash_store_handle.seek(0, os.SEEK_END) # Put the file cursor always at the end
                     file_hash_store_handle.write( f"{task_res.task.task_data["input_file"]}\t{get_file_hash(task_res.task.task_data["input_file"])}\n" )
 
-                files_processed += 1
+                    files_processed += 1
 
         # Wait sometime before querying the tasks again
         # The "if" is usefull not only to prevent exceptions, but also in making tests faster
