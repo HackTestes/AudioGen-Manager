@@ -3,6 +3,7 @@ import pathlib
 import sys
 import hashlib
 import argparse
+import platform
 import audio_providers
 import helpers
 
@@ -40,7 +41,7 @@ rany2_edge_tts_audio_provider = audio_providers.AudioProvider({
     True
 )
 
-audio_providers_per_lang = {"pt-BR": powershell_test_audio_provider, "en-US": powershell_test_audio_provider}
+audio_providers_per_lang = {"pt-BR": rany2_edge_tts_audio_provider, "en-US": rany2_edge_tts_audio_provider}
 
 # Get the file program arguments
 parser = argparse.ArgumentParser(description="Manages automatically audio generation services/providers")
@@ -50,8 +51,22 @@ parser.add_argument('--ignore-hashes', required=False, default=False, action='st
 parser.add_argument('--ignore-audio-files', required=False, default=False, action='store_true', help="Do not skip files that already have a audio file")
 parser.add_argument('--retry', required=False, type=int, default=2, help="How many times we shloud retry a command before consider it failed")
 parser.add_argument('--polling-rate', required=False, type=int, default=5, help="Polling interval in seconds") # Seconds
+parser.add_argument('--test', required=False, action='store_true', default=False, help="Changes the audio providers to testing ones (it auto-selects based on the platform)")
 
 args = parser.parse_args()
+
+# If we use the test flag, use one of these providers for each platform
+if args.test == True:
+    match platform.system():
+
+        case "Windows":
+            audio_providers_per_lang = {"pt-BR": powershell_test_audio_provider, "en-US": powershell_test_audio_provider}
+
+        case "Linux":
+            audio_providers_per_lang = {"pt-BR": bash_test_audio_provider, "en-US": bash_test_audio_provider}
+
+        case _:
+            audio_providers_per_lang = {"pt-BR": bash_test_audio_provider, "en-US": bash_test_audio_provider}
 
 # Is the argument really a folder?
 if not args.text_path.is_dir():
