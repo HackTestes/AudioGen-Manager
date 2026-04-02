@@ -156,14 +156,6 @@ def update_hash_store(file_hash_store, unchanged_files, file_hash_store_write_ha
     file_hash_store_write_handle.truncate(0) # Clear the file
     file_hash_store_write_handle.write( dict_to_tsv(unchanged_files) )
 
-def all_audio_providers_finish(audio_providers_per_lang):
-
-    for audio_provider in audio_providers_per_lang.values():
-        if audio_provider.has_finished() != True:
-            return False
-
-    return True
-
 # The file_hash_store_handle must be opened in append only mode!
 def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle, retry_limit):
 
@@ -179,9 +171,9 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
             # Load files until we run out of files or until we reach the maximum capacity
             while( audio_prov.has_capacity() and len(files_for_processing[lang]) > 0):
                 input_file = files_for_processing[lang].pop()
-                output_file = input_file.replace(".txt", ".mp3") #TODO: make the file extension configurable
-                print(f"Trying to run: {input_file} --> {output_file}")
-                audio_prov.run_task( input_file, output_file, lang, retry_limit )
+                command = audio_prov.run_task( input_file, lang, retry_limit )
+
+                print(f"Trying to run: {command}")
 
         # What has finished?
         # I haven't reused the previous loop bacause this allows all the files for all languages to be loaded first

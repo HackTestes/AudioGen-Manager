@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import shlex, subprocess
 import sys
+import pathlib
 
 class AudioProvider_LanguageNotSupported(Exception):
     pass
@@ -61,6 +62,20 @@ class Task():
     def data(self):
         return self.task_data
 
+def command_replacement(command: str, input_file_path: str):
+
+    # Support for the following replacements
+    # [input_file_path]: full path to the input file
+    # [input_file_name]: the file name without the path
+    # [input_file_stem]: just the file "name" without the extension (pathlib stem)
+    # [input_file_parent]: the path leading the the folder containing the file
+    command = command.replace("[input_file_path]", f"{pathlib.Path(input_file_path).as_posix()}")
+    command = command.replace("[input_file_name]", f"{str( pathlib.Path(input_file_path).name )}")
+    command = command.replace("[input_file_stem]", f"{str( pathlib.Path(input_file_path).stem )}")
+    command = command.replace("[input_file_parent]", f"{str( pathlib.Path(input_file_path).parent.as_posix() )}")
+
+    return command
+
 class AudioProvider():
 
     # Commands - which command will be used for each language: {"en-US": "<COMMAND>", "pt-BR": "<COMMAND>"}
@@ -85,7 +100,7 @@ class AudioProvider():
         self.task_handles[task_idx] = None
 
     # Adds a task to be executed by the provider
-    def run_task(self, input_file_path, output_file_path, lang, retry_limit):
+    def run_task(self, input_file_path, lang, retry_limit):
 
         if lang not in self.commands:
             raise AudioProvider_LanguageNotSupported()
@@ -95,17 +110,17 @@ class AudioProvider():
 
         current_command = self.commands[lang]
 
-        # Replace the input file field - the command must contain a "[input_file_path]"
-        current_command = current_command.replace("[input_file_path]", f"\"{input_file_path}\"")
+        # Make the necessary ajustments to the command string
+        current_command = command_replacement(current_command, input_file_path)
 
-        # Replace the output file field - the command must contain a "[output_file_path]"
-        current_command = current_command.replace("[output_file_path]", f"\"{output_file_path}\"")
-
-        task = Task(current_command, retry_limit, {"input_file": input_file_path, "output_file": output_file_path})
+        task = Task(current_command, retry_limit, {"input_file": input_file_path})
 
         # We only assign the task after opening the process,
         # so we don't leave the obj in an inconsistent state if it errors
         self.add_task(task)
+
+        # Retrun the command used so it can easier for testing and to report back to the user what is hapenning
+        return current_command
 
     # Check if any task has:
     # - completed;
@@ -173,9 +188,6 @@ class AudioProvider():
 
         if len(self.task_handles)-len(self.task_empty_slot) < self.execution_limit:
             return True
-
-    def has_finished(self):
-        return len(self.task_handles) == len(self.task_empty_slot)
 
         return False
 

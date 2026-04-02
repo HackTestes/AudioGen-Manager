@@ -154,7 +154,7 @@ class TestMethods(unittest.TestCase):
         capacity = 1
         audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path] [output_file_path]"}, capacity, False)
 
-        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 2)
+        audio_provider.run_task("input/file/path/text.txt", "pt-BR", 2)
 
         # Simulate an unfinshed process
         popen_mock.return_value.poll.return_value = None
@@ -188,7 +188,7 @@ class TestMethods(unittest.TestCase):
         capacity = 3
         audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path] [output_file_path]"}, capacity, False)
 
-        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
+        audio_provider.run_task("input/file/path/text.txt", "pt-BR", 5)
 
         # Simulate a fail for retry
         popen_mock.return_value.poll.return_value = 1
@@ -210,8 +210,8 @@ class TestMethods(unittest.TestCase):
         capacity = 3
         audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path] [output_file_path]"}, capacity, False)
 
-        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 1)
-        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 1)
+        audio_provider.run_task("input/file/path/text.txt", "pt-BR", 1)
+        audio_provider.run_task("input/file/path/text.txt", "pt-BR", 1)
 
         # Simulate a fail for retry
         popen_mock.return_value.poll.return_value = 1
@@ -234,12 +234,14 @@ class TestMethods(unittest.TestCase):
     @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_command_replacement(self, popen_mock):
 
-        capacity = 1
-        audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path] [output_file_path]"}, capacity, False)
+        capacity = 10
+        audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path] [input_file_stem] [input_file_name] [input_file_parent]"}, capacity, False)
 
-        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
+        command = audio_provider.run_task("input/file/path/text.txt", "pt-BR", 5)
+        self.assertEqual(command, "echo input/file/path/text.txt text text.txt input/file/path")
 
-        self.assertEqual(audio_provider.task_handles[0].command, "echo \"input/file/path\" \"output/file/path\"")
+        command = audio_provider.run_task("./input/file/path/text.txt", "pt-BR", 5)
+        self.assertEqual(command, "echo input/file/path/text.txt text text.txt input/file/path")
 
     # Does a popen error cause the AudioProvider to be in a broken state?
     @unittest.mock.patch("subprocess.Popen")
@@ -254,7 +256,7 @@ class TestMethods(unittest.TestCase):
         popen_mock.side_effect = FileNotFoundError
 
         with self.assertRaises(FileNotFoundError) as e:
-            audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
+            audio_provider.run_task("input/file/path/text.txt", "pt-BR", 5)
 
         self.assertEqual(len(audio_provider.task_empty_slot), 1)
         self.assertEqual(audio_provider.has_capacity(), True)
@@ -269,12 +271,12 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(len(audio_provider.task_empty_slot), 2)
         self.assertEqual(audio_provider.has_capacity(), True)
 
-        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
+        audio_provider.run_task("input/file/path/text.txt", "pt-BR", 5)
 
         self.assertEqual(len(audio_provider.task_empty_slot), 1)
         self.assertEqual(audio_provider.has_capacity(), True)
 
-        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
+        audio_provider.run_task("input/file/path/text.txt", "pt-BR", 5)
 
         self.assertEqual(len(audio_provider.task_empty_slot), 0)
         self.assertEqual(audio_provider.has_capacity(), False)
@@ -288,13 +290,13 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(len(audio_provider.task_empty_slot), 1)
         self.assertEqual(audio_provider.has_capacity(), True)
 
-        audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
+        audio_provider.run_task("input/file/path/text.txt", "pt-BR", 5)
 
         self.assertEqual(len(audio_provider.task_empty_slot), 0)
         self.assertEqual(audio_provider.has_capacity(), False)
 
         with self.assertRaises(audio_providers.AudioProvider_NoCapacityLeft) as e:
-            audio_provider.run_task("input/file/path", "output/file/path", "pt-BR", 5)
+            audio_provider.run_task("input/file/path/text.txt", "pt-BR", 5)
 
     @unittest.mock.patch("subprocess.Popen")
     def test_audio_provider_error_lang_not_supported(self, popen_mock):
@@ -303,7 +305,7 @@ class TestMethods(unittest.TestCase):
         audio_provider = audio_providers.AudioProvider({"pt-BR": "echo [input_file_path]"}, capacity, False)
 
         with self.assertRaises(audio_providers.AudioProvider_LanguageNotSupported) as e:
-            audio_provider.run_task("input/file/path", "output/file/path", "invalid-lang", 5)
+            audio_provider.run_task("input/file/path/text.txt", "invalid-lang", 5)
 
 
 if __name__ == "__main__":

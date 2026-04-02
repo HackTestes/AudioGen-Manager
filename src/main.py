@@ -11,8 +11,17 @@ languages = ["pt-BR", "en-US"]
 
 # Audio provider just for testing (Windows only)
 powershell_test_audio_provider = audio_providers.AudioProvider({
-        "pt-BR": "powershell -c 'echo pt-BR [input_file_path] [output_file_path]'",
-        "en-US": "powershell -c 'echo en-US [input_file_path] [output_file_path]'"
+        "pt-BR": "powershell -c 'echo pt-BR [input_file_path] [input_file_parent]/[input_file_stem].mp3'",
+        "en-US": "powershell -c 'echo en-US [input_file_path] [input_file_parent]/[input_file_stem].mp3'"
+    },
+    3,
+    False
+)
+
+# Audio provider just for testing (Linux only)
+bash_test_audio_provider = audio_providers.AudioProvider({
+        "pt-BR": "bash -c 'echo pt-BR [input_file_path] [output_file_path]'",
+        "en-US": "bash -c 'echo en-US [input_file_path] [output_file_path]'"
     },
     3,
     False
