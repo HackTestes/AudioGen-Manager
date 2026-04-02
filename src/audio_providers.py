@@ -34,7 +34,7 @@ class Task():
         self.retry_attempts = 0
         self.task_data = task_data
 
-        self.process_handle = subprocess.Popen(shlex.split(self.command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True, shell=False, encoding="UTF-8")
+        self.process_handle = subprocess.Popen(shlex.split(self.command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True, shell=False, universal_newlines=True)
 
     def retry(self):
 
@@ -47,7 +47,7 @@ class Task():
             self.retry_attempts += 1
 
             # Retry
-            self.process_handle = self.process_handle = subprocess.Popen(shlex.split(self.command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True, shell=False, encoding="UTF-8")
+            self.process_handle = self.process_handle = subprocess.Popen(shlex.split(self.command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True, shell=False, universal_newlines=True)
 
     def can_retry(self):
 
@@ -152,7 +152,7 @@ class AudioProvider():
                     try:
                         task.retry()
                         tasks_info.append( TaskResult(TaskSatus.RETRY, task.poll(), task) )
-                    
+
                     # An error occurred dung the retry (in a new popen call)
                     # Consider the task as failed
                     # Why catch almost everything? I want the program to process as much as possible without human intervention

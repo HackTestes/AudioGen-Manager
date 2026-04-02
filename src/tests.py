@@ -29,6 +29,7 @@ class TestMethods(unittest.TestCase):
         # Success
         # This means that every call will succeed
         popen_mock.return_value.poll.return_value = 0
+        popen_mock.return_value.communicate.return_value = (None, None)
 
         helpers.process_text_files(workload.files_need_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle_mock, retry_limit)
 

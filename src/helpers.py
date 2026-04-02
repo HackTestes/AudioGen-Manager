@@ -113,6 +113,7 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
             if pathlib.Path(file).suffix == ".txt":
 
                 file_stem = pathlib.Path(file).stem # The name without the path or the suffix (folder/text.txt -> text)
+                #file_path = pathlib.Path(f"{root}/{file_stem}.txt").as_posix()
                 file_path = f"{root}/{file_stem}.txt"
 
                 with open(file_path, "r", encoding="UTF-8") as file_handle:
@@ -183,23 +184,30 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
 
             # If all the tasks are still executing, an empty list will be returned. In which case, the for loop will be skipped
             for task_res in results:
+                stdout, stderr = task_res.task.process_handle.communicate()
 
                 # Display information for the user
                 if task_res.status == audio_providers.TaskSatus.FAIL:
-                    print(f"(FAIL) - command: {task_res.task.command} - return code: {task_res.return_code}")
+                    print(f"\n(FAIL) - Input file: {task_res.task.task_data["input_file"]} \nCOMMAND: {task_res.task.command} \nRETURN CODE: {task_res.return_code}")
+                    print(f"----------------------STDOUT----------------------\n\n{stdout}\n--------------------------------------------------\n\n")
+                    print(f"----------------------STDERR----------------------\n\n{stderr}\n--------------------------------------------------\n\n")
                     files_processed += 1
 
                 if task_res.status == audio_providers.TaskSatus.RETRY:
-                    print(f"(RETRY) - command: {task_res.task.command} - Attempts: {task_res.task.retry_attempts}/{task_res.task.retry_limit}")
+                    print(f"\n(RETRY) - Input file: {task_res.task.task_data["input_file"]} \nCOMMAND: {task_res.task.command} \nATTEMPTS: {task_res.task.retry_attempts}/{task_res.task.retry_limit}")
+                    print(f"----------------------STDOUT----------------------\n\n{stdout}\n--------------------------------------------------\n\n")
+                    print(f"----------------------STDERR----------------------\n\n{stderr}\n--------------------------------------------------\n\n")
 
                 if task_res.status == audio_providers.TaskSatus.SUCCESS:
-                    print(f"(SUCCESS) - command: {task_res.task.command}")
+                    print(f"\n(SUCCESS) - Input file: {task_res.task.task_data["input_file"]} \nCOMMAND: {task_res.task.command}")
                     # Append the file hash to the store, so other executions will skip it if it remains unchanged
                     # We can only do that AFTER the audio was generated (it also means that it can only occour in successful runs)
                     file_hash_store_handle.seek(0, os.SEEK_END) # Put the file cursor always at the end
                     file_hash_store_handle.write( f"{task_res.task.task_data["input_file"]}\t{get_file_hash(task_res.task.task_data["input_file"])}\n" )
 
                     files_processed += 1
+
+        print(f"Progress: {files_processed}/{total_file_count}\n")
 
         # Wait sometime before querying the tasks again
         # The "if" is usefull not only to prevent exceptions, but also in making tests faster
