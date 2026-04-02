@@ -75,12 +75,12 @@ if not args.text_path.is_dir():
 
 # Open the hash store
 with open(args.hash_path, "r+", encoding="UTF-8") as file_hash_store_handle:
-    file_hash_store = helpers.read_hash_store(args.hash_path)
+    hash_store = helpers.read_hash_store(args.hash_path)
 
     # Get the workload
-    workload = helpers.get_files_to_gen_audio(args.text_path, file_hash_store, languages, args.ignore_audio_files, args.ignore_hashes)
+    workload = helpers.get_files_to_gen_audio(args.text_path, hash_store, languages, args.ignore_audio_files, args.ignore_hashes)
 
     # Update the hash store if necessary
-    helpers.update_hash_store(file_hash_store, workload.files_unchanged, file_hash_store_handle)
+    helpers.update_hash_store(hash_store, workload.unchanged_hashes, file_hash_store_handle)
 
     helpers.process_text_files(workload.files_need_processing, args.polling_rate, audio_providers_per_lang, file_hash_store_handle, args.retry)

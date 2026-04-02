@@ -12,6 +12,8 @@ precomputed_hash_store = {
             "test_data/texts/file_hashed_003.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         }
 
+precomputed_hash_store = {"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"} # Hash for test_data/texts/file_hashed_00*.txt (empty file)
+
 class TestMethods(unittest.TestCase):
 
     @unittest.mock.patch("subprocess.Popen")
@@ -35,9 +37,9 @@ class TestMethods(unittest.TestCase):
 
         popen_mock.assert_called()
         file_hash_store_handle_mock.write.assert_has_calls([
-            unittest.mock.call("test_data/texts/file_pt-BR.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n"),
-            unittest.mock.call("test_data/texts/file_en-US.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n"),
-            unittest.mock.call("test_data/texts/file.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n")
+            unittest.mock.call("a9f51566bd6705f7ea6ad54bb9deb449f795582d6529a0e22207b8981233ec58\n"),
+            unittest.mock.call("3f39d5c348e5b79d06e842c114e6cc571583bbf44e4b0ebfda1a01ec05745d43\n"),
+            unittest.mock.call("559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd\n")
         ])
 
 
@@ -47,14 +49,14 @@ class TestMethods(unittest.TestCase):
 
     def test_update_hash_store_needs_update(self):
         parsed_hash_store = helpers.read_hash_store("./test_data/file_hash_store.tsv")
-        parsed_hash_store.popitem()
+        parsed_hash_store.pop()
 
         file_handle_mock = unittest.mock.mock_open()() # Creates the open mock an then tries to "open" a file
 
         helpers.update_hash_store(precomputed_hash_store, parsed_hash_store, file_handle_mock)
         file_handle_mock.truncate.assert_called_with(0)
         file_handle_mock.write.assert_called()
-        file_handle_mock.write.assert_called_with( helpers.dict_to_tsv(parsed_hash_store) )
+        file_handle_mock.write.assert_called_with( "\n".join(parsed_hash_store) )
 
     def test_update_hash_store_no_update(self):
 
@@ -70,7 +72,11 @@ class TestMethods(unittest.TestCase):
             "pt-BR": ["test_data/texts/file.txt", "test_data/texts/file_pt-BR.txt"],
             "en-US": ["test_data/texts/file_en-US.txt"]
         })
-        self.assertEqual(workload.files_unchanged, precomputed_hash_store)
+        self.assertEqual(list(workload.files_unchanged.keys()), [
+            "test_data/texts/file_hashed_001.txt",
+            "test_data/texts/file_hashed_002.txt",
+            "test_data/texts/file_hashed_003.txt"
+        ])
 
     def test_get_files_to_gen_audio_ignore_hash_store(self):
 
@@ -90,7 +96,14 @@ class TestMethods(unittest.TestCase):
             "pt-BR": ["test_data/texts/file.txt", "test_data/texts/file_002.txt", "test_data/texts/file_003.txt", "test_data/texts/file_pt-BR.txt"],
             "en-US": ["test_data/texts/file_en-US.txt"]
         })
-        self.assertEqual(workload.files_unchanged, precomputed_hash_store)
+
+        self.assertEqual(list(workload.files_unchanged.keys()), [
+            "test_data/texts/file_hashed_001.txt",
+            "test_data/texts/file_hashed_002.txt",
+            "test_data/texts/file_hashed_003.txt"
+        ])
+
+        self.assertEqual(workload.unchanged_hashes, set(["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"]))
 
 
     def test_tsv_to_dict(self):
@@ -137,6 +150,39 @@ class TestMethods(unittest.TestCase):
         }
 
         self.assertEqual(helpers.dict_to_tsv(dictionary), expect)
+
+    def test_hash_list_to_set(self):
+        hash_str = ("0000000000\n"
+                    "0000000000\n"
+                    "1000000000\n"
+                    "2000000000\n"
+                    "\n\n\n"
+        )
+
+        expect = {
+            "0000000000",
+            "1000000000",
+            "2000000000"
+        }
+
+        self.assertEqual(helpers.hash_list_to_set(hash_str), expect)
+
+    def test_test_hash_list_to_setskip_empty_rows(self):
+        hash_str = ("0000000000\n"
+                    "0000000000\n"
+                    "\n\n\n\n"
+                    "1000000000\n"
+                    "2000000000\n"
+                    "\n\n\n"
+        )
+
+        expect = {
+            "0000000000",
+            "1000000000",
+            "2000000000"
+        }
+
+        self.assertEqual(helpers.hash_list_to_set(hash_str), expect)
 
     def test_get_file_lang(self):
         self.assertEqual(helpers.get_file_lang("file"), "pt-BR")

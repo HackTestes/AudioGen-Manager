@@ -40,6 +40,28 @@ def tsv_to_dict(tsv_content_str):
 
     return path_hash_pair
 
+# This one only holds the hashes of the files, therefore it ignores completely the file name or path
+# This is similar to the tsv one, but each line only contains a hash
+#    hash\n...
+def hash_list_to_set(hash_list_str):
+
+    files_hashset = set()
+
+    # Avoid getting empty rows
+    hash_list_str = hash_list_str.strip()
+
+    rows = hash_list_str.split("\n")
+
+    for row in rows:
+
+        # Just skip possible empty rows
+        if len(row) == 0:
+            continue
+
+        files_hashset.add(row)
+
+    return files_hashset
+
 # Assume a "flat" dict (a simple key value - file:hash)
 def dict_to_tsv(dictionary):
     tsv_str = ""
@@ -51,7 +73,7 @@ def dict_to_tsv(dictionary):
 
 def read_hash_store(hash_store_path):
     with open(hash_store_path, "r", encoding="UTF-8") as hf:
-        return tsv_to_dict( hf.read() )
+        return hash_list_to_set( hf.read() )
 
 # Opening the same file multiple times isn't good for performance, but doing it any other way makes the code confusing
 def get_file_hash(path):
@@ -92,15 +114,17 @@ def files_to_process_total_len(files_per_lang):
     return total_size
 
 class Workload():
-    def __init__(self, files_that_need_processing, files_unchanged):
+    def __init__(self, files_that_need_processing, files_unchanged, unchanged_hashes):
         self.files_need_processing = files_that_need_processing
         self.files_unchanged = files_unchanged
+        self.unchanged_hashes = unchanged_hashes
 
 
-def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_files=False, ignore_hash=False):
+def get_files_to_gen_audio(text_path, hash_store, languages, ignore_audio_files=False, ignore_hash=False):
 
     files_for_processing = {}
     unchanged_files = {}
+    unchanged_hashes = set()
 
     # Populate the variable with language specific lists
     for lang in languages:
@@ -126,11 +150,12 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
                     # Have they changed since the last execution (aka is their hash different or is it absent from the store)?
                     file_hash = get_file_hash(file_path)
 
-                    if file_path in file_hash_store and file_hash == file_hash_store[file_path] and not ignore_hash:
+                    if file_hash in hash_store and not ignore_hash:
 
                         # The file exists in the store and hasn't changed
                         # It means that it was already processed (even though it does not have a audio file)
                         unchanged_files[ file_path ] = file_hash
+                        unchanged_hashes.add( file_hash )
                         continue
 
                     # So this is a new file without any audio
@@ -141,20 +166,20 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
                     # Put the files in the correct language "bucket" for later processing
                     files_for_processing[lang].append(file_path)
 
-    return Workload(files_for_processing, unchanged_files)
+    return Workload(files_for_processing, unchanged_files, unchanged_hashes)
 
-def update_hash_store(file_hash_store, unchanged_files, file_hash_store_write_handle):
+def update_hash_store(hash_store, unchanged_hashes, file_hash_store_write_handle):
 
     # If they have the same elements; these elements are the same and they have the same amount, then they are the same (think of sets in math)
     # We only check this last condition in here
-    if len(file_hash_store) == len(unchanged_files):
+    if len(hash_store) == len(unchanged_hashes):
         # In this case we don't need to update anything on the file
         return
 
     # Some things have changed, we need to remove the changed entries
     # We can also just insert the unchanged files
     file_hash_store_write_handle.truncate(0) # Clear the file
-    file_hash_store_write_handle.write( dict_to_tsv(unchanged_files) )
+    file_hash_store_write_handle.write( "\n".join(unchanged_hashes) )
 
 # The file_hash_store_handle must be opened in append only mode!
 def process_text_files(files_for_processing, polling_interval, audio_providers_per_lang, file_hash_store_handle, retry_limit):
@@ -202,7 +227,7 @@ def process_text_files(files_for_processing, polling_interval, audio_providers_p
                     # Append the file hash to the store, so other executions will skip it if it remains unchanged
                     # We can only do that AFTER the audio was generated (it also means that it can only occour in successful runs)
                     file_hash_store_handle.seek(0, os.SEEK_END) # Put the file cursor always at the end
-                    file_hash_store_handle.write( f"{task_res.task.task_data["input_file"]}\t{get_file_hash(task_res.task.task_data["input_file"])}\n" )
+                    file_hash_store_handle.write( f"{get_file_hash(task_res.task.task_data["input_file"])}\n" )
 
                     files_processed += 1
 
