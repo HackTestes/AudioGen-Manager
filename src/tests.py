@@ -7,9 +7,9 @@ import audio_providers
 # The hashes are all the same, because all of them are empty files
 # sha256
 precomputed_hash_store = {
-            "./test_data/texts/file_hashed_001.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            "./test_data/texts/file_hashed_002.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            "./test_data/texts/file_hashed_003.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "test_data/texts/file_hashed_001.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "test_data/texts/file_hashed_002.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "test_data/texts/file_hashed_003.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         }
 
 class TestMethods(unittest.TestCase):
@@ -35,9 +35,9 @@ class TestMethods(unittest.TestCase):
 
         popen_mock.assert_called()
         file_hash_store_handle_mock.write.assert_has_calls([
-            unittest.mock.call("./test_data/texts/file_pt-BR.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n"),
-            unittest.mock.call("./test_data/texts/file_en-US.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n"),
-            unittest.mock.call("./test_data/texts/file.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n")
+            unittest.mock.call("test_data/texts/file_pt-BR.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n"),
+            unittest.mock.call("test_data/texts/file_en-US.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n"),
+            unittest.mock.call("test_data/texts/file.txt\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n")
         ])
 
 
@@ -67,8 +67,8 @@ class TestMethods(unittest.TestCase):
 
         workload = helpers.get_files_to_gen_audio("./test_data/texts", precomputed_hash_store, ["pt-BR", "en-US"])
         self.assertEqual(workload.files_need_processing, {
-            "pt-BR": ["./test_data/texts/file.txt", "./test_data/texts/file_pt-BR.txt"],
-            "en-US": ["./test_data/texts/file_en-US.txt"]
+            "pt-BR": ["test_data/texts/file.txt", "test_data/texts/file_pt-BR.txt"],
+            "en-US": ["test_data/texts/file_en-US.txt"]
         })
         self.assertEqual(workload.files_unchanged, precomputed_hash_store)
 
@@ -76,17 +76,19 @@ class TestMethods(unittest.TestCase):
 
         workload = helpers.get_files_to_gen_audio("./test_data/texts", precomputed_hash_store, ["pt-BR", "en-US"], ignore_hash=True)
         self.assertEqual(workload.files_need_processing, {
-            "pt-BR": ["./test_data/texts/file.txt", "./test_data/texts/file_hashed_001.txt", "./test_data/texts/file_hashed_002.txt", "./test_data/texts/file_hashed_003.txt", "./test_data/texts/file_pt-BR.txt"],
-            "en-US": ["./test_data/texts/file_en-US.txt"]
+            "pt-BR": ["test_data/texts/file.txt", "test_data/texts/file_hashed_001.txt", "test_data/texts/file_hashed_002.txt", "test_data/texts/file_hashed_003.txt", "test_data/texts/file_pt-BR.txt"],
+            "en-US": ["test_data/texts/file_en-US.txt"]
         })
         self.assertEqual(workload.files_unchanged, {})
 
     def test_get_files_to_gen_audio_ignore_audio_file(self):
 
+        self.maxDiff = None
+
         workload = helpers.get_files_to_gen_audio("./test_data/texts", precomputed_hash_store, ["pt-BR", "en-US"], ignore_audio_files=True)
         self.assertEqual(workload.files_need_processing, {
-            "pt-BR": ["./test_data/texts/file.txt", "./test_data/texts/file_002.txt", "./test_data/texts/file_003.txt", "./test_data/texts/file_pt-BR.txt"],
-            "en-US": ["./test_data/texts/file_en-US.txt"]
+            "pt-BR": ["test_data/texts/file.txt", "test_data/texts/file_002.txt", "test_data/texts/file_003.txt", "test_data/texts/file_pt-BR.txt"],
+            "en-US": ["test_data/texts/file_en-US.txt"]
         })
         self.assertEqual(workload.files_unchanged, precomputed_hash_store)
 

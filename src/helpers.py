@@ -113,8 +113,7 @@ def get_files_to_gen_audio(text_path, file_hash_store, languages, ignore_audio_f
             if pathlib.Path(file).suffix == ".txt":
 
                 file_stem = pathlib.Path(file).stem # The name without the path or the suffix (folder/text.txt -> text)
-                #file_path = pathlib.Path(f"{root}/{file_stem}.txt").as_posix()
-                file_path = f"{root}/{file_stem}.txt"
+                file_path = pathlib.Path(f"{root}/{file_stem}.txt").as_posix()
 
                 with open(file_path, "r", encoding="UTF-8") as file_handle:
 
