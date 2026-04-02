@@ -33,8 +33,8 @@ bash_test_audio_provider = audio_providers.AudioProvider({
 #    edge-tts: create the audio files in the tmp folder at the equivalent folder
 #    mv: after a successful creation, move the file from the tmp (RAM backed) to the persistent storage alongside the input file
 rany2_edge_tts_audio_provider = audio_providers.AudioProvider({
-        "pt-BR": "bash -c \"echo 'mkdir -p /tmp/[input_file_parent] && edge-tts --voice pt-BR-FranciscaNeural --file [input_file_path] --write-media /tmp/[input_file_parent]/[input_file_stem].mp3 && mv /tmp/[input_file_parent]/[input_file_stem].mp3 [input_file_parent]/\"",
-        "en-US": "bash -c \"echo 'mkdir -p /tmp/[input_file_parent] && edge-tts --voice en-US-AndrewNeural --file [input_file_path] --write-media /tmp/[input_file_parent]/[input_file_stem].mp3 && mv /tmp/[input_file_parent]/[input_file_stem].mp3 [input_file_parent]/\""
+        "pt-BR": "bash -c \"mkdir -p /tmp/[input_file_parent] && edge-tts --voice pt-BR-FranciscaNeural --file [input_file_path] --write-media /tmp/[input_file_parent]/[input_file_stem].mp3 && mv /tmp/[input_file_parent]/[input_file_stem].mp3 [input_file_parent]/\"",
+        "en-US": "bash -c \"mkdir -p /tmp/[input_file_parent] && edge-tts --voice en-US-AndrewNeural --file [input_file_path] --write-media /tmp/[input_file_parent]/[input_file_stem].mp3 && mv /tmp/[input_file_parent]/[input_file_stem].mp3 [input_file_parent]/\""
     },
     3,
     True
