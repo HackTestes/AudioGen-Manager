@@ -21,8 +21,8 @@ powershell_test_audio_provider = audio_providers.AudioProvider({
 
 # Audio provider just for testing (Linux only)
 bash_test_audio_provider = audio_providers.AudioProvider({
-        "pt-BR": "bash -c 'echo pt-BR [input_file_path] [output_file_path]'",
-        "en-US": "bash -c 'echo en-US [input_file_path] [output_file_path]'"
+        "pt-BR": "bash -c 'echo pt-BR [input_file_path] [input_file_parent]/[input_file_stem].mp3'",
+        "en-US": "bash -c 'echo en-US [input_file_path] [input_file_parent]/[input_file_stem].mp3'"
     },
     3,
     False
